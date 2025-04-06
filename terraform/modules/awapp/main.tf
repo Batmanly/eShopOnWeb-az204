@@ -9,5 +9,6 @@ resource "azurerm_windows_web_app" "awapp" {
       dotnet_version = var.dotnet_version
     }
   }
+  app_settings = var.app_settings
 
 }
