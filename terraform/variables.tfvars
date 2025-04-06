@@ -1,0 +1,54 @@
+location = "northeurope"
+ASP_OBJECTS = {
+  "aspwebwest" = {
+    location = "westeurope"
+    os_type  = "Windows"
+    sku_name = "S1"
+  },
+  "aspwebnorth" = {
+    location = "northeurope"
+    os_type  = "Windows"
+    sku_name = "S1"
+  },
+  "aspapinorth" = {
+    location = "northeurope"
+    os_type  = "Windows"
+    sku_name = "S1"
+  },
+}
+
+AWAPP_OBJECTS = {
+  "aspwebwest" = {
+    dotnet_version   = "v9.0"
+    service_plan_key = "aspwebwest"
+  },
+  "aspwebnorth" = {
+    dotnet_version   = "v9.0"
+    service_plan_key = "aspwebnorth"
+  },
+  "aspapinorth" = {
+    dotnet_version   = "v9.0"
+    service_plan_key = "aspapinorth"
+  }
+}
+
+AWAPPSLOT_OBJECTS = {
+  "staging" = {
+    name             = "staging"
+    service_plan_key = "aspwebnorth"
+    dotnet_version   = "v9.0"
+
+  }
+}
+
+TRAF_ENDPOINT_OBJECTS = {
+  "aspwebwest" = {
+    endpoint_key = "aspwebwest"
+
+  },
+  "aspapinorth" = {
+    endpoint_key = "aspapinorth"
+
+  }
+}
+
