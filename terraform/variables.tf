@@ -33,6 +33,7 @@ variable "AWAPP_OBJECTS" {
   type = map(object({
     dotnet_version   = string
     service_plan_key = string
+    app_settings     = map(string)
   }))
 }
 
@@ -41,6 +42,7 @@ variable "AWAPPSLOT_OBJECTS" {
     name             = string
     service_plan_key = string
     dotnet_version   = string
+    app_settings     = map(string)
   }))
 
 }

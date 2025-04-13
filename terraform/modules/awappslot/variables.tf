@@ -14,3 +14,8 @@ variable "dotnet_version" {
   default     = "v9.0"
 
 }
+
+variable "app_settings" {
+  description = "The application settings"
+  type        = map(string)
+}

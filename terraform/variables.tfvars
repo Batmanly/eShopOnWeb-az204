@@ -21,14 +21,23 @@ AWAPP_OBJECTS = {
   "aspwebwest" = {
     dotnet_version   = "v9.0"
     service_plan_key = "aspwebwest"
+    app_settings = {
+      ASPNETCORE_ENVIRONMENT = "Development"
+    }
   },
   "aspwebnorth" = {
     dotnet_version   = "v9.0"
     service_plan_key = "aspwebnorth"
+    app_settings = {
+      ASPNETCORE_ENVIRONMENT = "Development"
+    }
   },
   "aspapinorth" = {
     dotnet_version   = "v9.0"
     service_plan_key = "aspapinorth"
+    app_settings = {
+      ASPNETCORE_ENVIRONMENT = "Development"
+    }
   }
 }
 
@@ -37,6 +46,9 @@ AWAPPSLOT_OBJECTS = {
     name             = "staging"
     service_plan_key = "aspwebnorth"
     dotnet_version   = "v9.0"
+    app_settings = {
+      ASPNETCORE_ENVIRONMENT = "Development"
+    }
 
   }
 }
