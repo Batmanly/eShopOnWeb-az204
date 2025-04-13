@@ -26,7 +26,10 @@ module "AWAPP" {
   location            = module.ASP[each.value.service_plan_key].location
   service_plan_id     = module.ASP[each.value.service_plan_key].id
   dotnet_version      = each.value.dotnet_version
-  app_settings        = each.value.app_settings
+  app_settings = merge(
+    each.value.app_settings,
+    each.key == "aspapinorth" ? { "APPINSIGHTS_INSTRUMENTATIONKEY" = module.APPI.instrumentation_key } : {}
+  )
 }
 
 module "AWAPPSLOT" {
@@ -107,3 +110,23 @@ module "TRAF_ENDPOINT" {
   name               = each.key
 
 }
+
+module "LOG" {
+  source              = "./modules/log"
+  name                = join("-", [var.PREFIX, "LOG", local.YEAR, var.ENV])
+  resource_group_name = module.RG.name
+  location            = module.RG.location
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
+
+module "APPI" {
+  source              = "./modules/appi"
+  name                = join("-", [var.PREFIX, "APPINS", local.YEAR, var.ENV])
+  resource_group_name = module.RG.name
+  location            = module.RG.location
+  application_type    = "web"
+  workspace_id        = module.LOG.id
+}
+
+
