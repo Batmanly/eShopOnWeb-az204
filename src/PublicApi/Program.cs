@@ -1,4 +1,5 @@
-﻿using BlazorShared;
+﻿using System;
+using BlazorShared;
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.Builder;
@@ -68,6 +69,17 @@ await app.SeedDatabaseAsync();
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
+}
+
+// Add throw new Exception ("Cannot move further") in Program.cs 
+
+try
+{
+    throw new Exception("Cannot move further in Program.cs");
+}
+catch (System.Exception ex)
+{
+    app.Logger.LogError(ex, "An error occurred. in Program.cs");
 }
 
 app.UseMiddleware<ExceptionMiddleware>();

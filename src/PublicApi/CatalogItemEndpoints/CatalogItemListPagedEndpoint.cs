@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.eShopWeb.ApplicationCore.Entities;
 using Microsoft.eShopWeb.ApplicationCore.Interfaces;
 using Microsoft.eShopWeb.ApplicationCore.Specifications;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.eShopWeb.PublicApi.CatalogItemEndpoints;
 
@@ -26,8 +27,18 @@ public class CatalogItemListPagedEndpoint(IRepository<CatalogItem> itemRepositor
              .WithTags("CatalogItemEndpoints"));
     }
 
+
+
     public override async Task<ListPagedCatalogItemResponse> ExecuteAsync(ListPagedCatalogItemRequest request, CancellationToken ct)
     {
+        try
+        {
+            throw new Exception("Cannot move further in CatalogItemListEndpoint.cs");
+        }
+        catch (System.Exception ex)
+        {
+            Logger.LogError(ex, "An error occurred. in CatalogItemListEndpoint.cs");
+        }
         await Task.Delay(1000, ct);
 
         var response = new ListPagedCatalogItemResponse(request.CorrelationId());
@@ -57,6 +68,10 @@ public class CatalogItemListPagedEndpoint(IRepository<CatalogItem> itemRepositor
         {
             response.PageCount = totalItems > 0 ? 1 : 0;
         }
+
+
+        Logger.LogWarning("Retrieved {ItemCount} catalog items from the database for page index {PageIndex} and page size {PageSize}.",
+             response.CatalogItems.Count, request.PageIndex, request.PageSize);
 
         return response;
     }
