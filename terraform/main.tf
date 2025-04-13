@@ -26,7 +26,7 @@ module "AWAPP" {
   location            = module.ASP[each.value.service_plan_key].location
   service_plan_id     = module.ASP[each.value.service_plan_key].id
   dotnet_version      = each.value.dotnet_version
-
+  app_settings        = each.value.app_settings
 }
 
 module "AWAPPSLOT" {
@@ -35,6 +35,7 @@ module "AWAPPSLOT" {
   name           = each.value.name
   app_service_id = module.AWAPP[each.value.service_plan_key].id
   dotnet_version = each.value.dotnet_version
+  app_settings   = each.value.app_settings
 }
 
 resource "azurerm_monitor_autoscale_setting" "amass" {

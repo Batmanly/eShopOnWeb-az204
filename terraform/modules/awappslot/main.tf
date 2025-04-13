@@ -7,5 +7,6 @@ resource "azurerm_windows_web_app_slot" "awappslot" {
       dotnet_version = var.dotnet_version
     }
   }
+  app_settings = var.app_settings
 
 }
