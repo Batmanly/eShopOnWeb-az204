@@ -36,3 +36,7 @@ resource "local_file" "WEB_APP" {
   )
   filename = "${path.module}/../src/Web/appsettings.json"
 }
+
+output "FUNCTION_APP_URL" {
+  value = module.WFA.default_hostname
+}

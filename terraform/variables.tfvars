@@ -15,6 +15,11 @@ ASP_OBJECTS = {
     os_type  = "Windows"
     sku_name = "S1"
   },
+  "aspfunctionnorth" = {
+    location = "northeurope"
+    os_type  = "Windows"
+    sku_name = "Y1"
+  }
 }
 
 AWAPP_OBJECTS = {
