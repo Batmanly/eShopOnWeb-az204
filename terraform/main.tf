@@ -130,3 +130,27 @@ module "APPI" {
 }
 
 
+module "SA" {
+  source                   = "./modules/sa"
+  name                     = lower(join("", [var.PREFIX, "STORAGE", local.YEAR, var.ENV]))
+  resource_group_name      = module.RG.name
+  location                 = module.RG.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
+module "WFA" {
+  source                     = "./modules/wfa"
+  name                       = join("-", [var.PREFIX, "WFA", local.YEAR, var.ENV])
+  resource_group_name        = module.RG.name
+  location                   = module.RG.location
+  storage_account_name       = module.SA.name
+  storage_account_access_key = module.SA.primary_access_key
+  service_plan_id            = module.ASP["aspfunctionnorth"].id
+  app_settings = {
+    "application_insights_connection_string" = module.APPI.connection_string
+    "application_insights_key"               = module.APPI.instrumentation_key
+    "functions_extension_version"            = "v9.0"
+  }
+
+}
