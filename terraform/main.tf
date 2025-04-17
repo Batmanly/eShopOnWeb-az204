@@ -154,6 +154,7 @@ module "WFA" {
     "application_insights_connection_string" = module.APPI.connection_string
     "application_insights_key"               = module.APPI.instrumentation_key
 }
+}
 
 module "SAC" {
   source                = "./modules/sac"
