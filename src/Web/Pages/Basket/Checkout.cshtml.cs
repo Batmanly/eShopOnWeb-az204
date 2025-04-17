@@ -1,4 +1,6 @@
-﻿using Ardalis.GuardClauses;
+﻿using System.Text;
+using System.Text.Json;
+using Ardalis.GuardClauses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -54,12 +56,61 @@ public class CheckoutModel : PageModel
 
             var updateModel = items.ToDictionary(b => b.Id.ToString(), b => b.Quantity);
             await _basketService.SetQuantities(BasketModel.Id, updateModel);
-            await _orderService.CreateOrderAsync(BasketModel.Id, new Address("123 Main St.", "Kent", "OH", "United States", "44240"));
+
+            var orderAddress = new Address("123 Main St.", "Kent", "OH", "United States", "44240");
+            await _orderService.CreateOrderAsync(BasketModel.Id, orderAddress);
+
+            // Prepare order details for external API call
+
+            // create uniq order id
+
+            var orderId = Guid.NewGuid().ToString();
+
+            var orderDetails = new
+            {
+                OrderId = orderId,
+                BasketId = BasketModel.Id,
+                BuyerId = BasketModel.BuyerId,
+                Items = BasketModel.Items.Select(i => new
+                {
+                    i.Id,
+                    i.ProductName,
+                    i.Quantity,
+                    i.UnitPrice
+                }),
+                ShippingAddress = new
+                {
+                    orderAddress.Street,
+                    orderAddress.City,
+                    orderAddress.State,
+                    orderAddress.Country,
+                    orderAddress.ZipCode
+                }
+            };
+
+
+            var jsonContent = new StringContent(JsonSerializer.Serialize(orderDetails), Encoding.UTF8, "application/json");
+
+            // Get URL from environment variable
+            // This should be set in your Azure Function App settings
+            var url = Environment.GetEnvironmentVariable("OrderItemsReserverUrl");
+
+            // Make external API call
+            using (var httpClient = new HttpClient())
+            {
+                //var response = await httpClient.PostAsync("https://fda1232121.azurewebsites.net/api/OrderItemsReserver", jsonContent);
+                var response = await httpClient.PostAsync(url, jsonContent);
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Failed to send order details to external API. Status Code: {StatusCode}", response.StatusCode);
+                    return StatusCode((int)response.StatusCode);
+                }
+            }
+
             await _basketService.DeleteBasketAsync(BasketModel.Id);
         }
         catch (EmptyBasketOnCheckoutException emptyBasketOnCheckoutException)
         {
-            //Redirect to Empty Basket page
             _logger.LogWarning(emptyBasketOnCheckoutException.Message);
             return RedirectToPage("/Basket/Index");
         }
