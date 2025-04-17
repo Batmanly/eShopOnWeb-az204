@@ -38,3 +38,10 @@ output "primary_queue_endpoint" {
   description = "The primary queue endpoint for the storage account."
   value       = azurerm_storage_account.sa.primary_queue_endpoint
 }
+
+
+output "connection_string" {
+  description = "The connection string for the storage account."
+  value       = azurerm_storage_account.sa.primary_blob_connection_string
+
+}

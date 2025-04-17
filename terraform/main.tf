@@ -28,7 +28,10 @@ module "AWAPP" {
   dotnet_version      = each.value.dotnet_version
   app_settings = merge(
     each.value.app_settings,
-    each.key == "aspapinorth" ? { "APPINSIGHTS_INSTRUMENTATIONKEY" = module.APPI.instrumentation_key } : {}
+    each.key == "aspapinorth" ? { "APPINSIGHTS_INSTRUMENTATIONKEY" = module.APPI.instrumentation_key } : {},
+    // OrderItemsReserverUrl
+    each.key == "aspwebnorth" ? { "OrderItemsReserverUrl" = "https://${module.WFA.default_hostname}/api/OrderItemsReserver" } : {},
+    each.key == "aspwebwest" ? { "OrderItemsReserverUrl" = "https://${module.WFA.default_hostname}/api/OrderItemsReserver" } : {},
   )
 }
 
@@ -150,7 +153,15 @@ module "WFA" {
   app_settings = {
     "application_insights_connection_string" = module.APPI.connection_string
     "application_insights_key"               = module.APPI.instrumentation_key
-    "functions_extension_version"            = "v9.0"
+    # "functions_extension_version"            = "v9.0"
+    # "application_stack" = "v9.0"
   }
 
+}
+
+module "SAC" {
+  source                = "./modules/sac"
+  name                  = "orders"
+  container_access_type = "private"
+  storage_account_id    = module.SA.id
 }
