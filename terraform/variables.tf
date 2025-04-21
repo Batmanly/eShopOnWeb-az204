@@ -53,3 +53,7 @@ variable "TRAF_ENDPOINT_OBJECTS" {
     endpoint_key = string
   }))
 }
+
+variable "ip_address" {
+  type = string
+}

@@ -69,3 +69,5 @@ TRAF_ENDPOINT_OBJECTS = {
   }
 }
 
+
+ip_address = "95.15.236.3"

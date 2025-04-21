@@ -153,7 +153,7 @@ module "WFA" {
   app_settings = {
     "application_insights_connection_string" = module.APPI.connection_string
     "application_insights_key"               = module.APPI.instrumentation_key
-}
+  }
 }
 
 module "SAC" {
@@ -161,4 +161,86 @@ module "SAC" {
   name                  = "orders"
   container_access_type = "private"
   storage_account_id    = module.SA.id
+}
+
+module "UAI" {
+  source              = "./modules/uai"
+  name                = join("-", [var.PREFIX, "UAI", local.YEAR, var.ENV])
+  resource_group_name = module.RG.name
+  location            = module.RG.location
+
+}
+
+module "KV" {
+  source              = "./modules/kv"
+  name                = join("-", [var.PREFIX, "KV", local.YEAR, var.ENV])
+  resource_group_name = module.RG.name
+  location            = module.RG.location
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  sku_name            = "standard"
+
+}
+
+module "KV_POLICY" {
+  source                  = "./modules/kvpolicy"
+  key_vault_id            = module.KV.id
+  tenant_id               = data.azurerm_client_config.current.tenant_id
+  object_id               = module.UAI.principal_id
+  key_permissions         = ["Get", "List", "Delete", "Create"]
+  secret_permissions      = ["Get", "Set", "Delete"]
+  certificate_permissions = ["Get"]
+}
+
+resource "random_password" "sql_admin_password" {
+  length  = 16
+  special = true
+}
+
+module "SQLServer" {
+  source                       = "./modules/sqlserver"
+  name                         = lower(join("", [var.PREFIX, "SQL", local.YEAR, var.ENV]))
+  resource_group_name          = module.RG.name
+  location                     = module.RG.location
+  administrator_login          = "sqladmin"
+  administrator_login_password = random_password.sql_admin_password.result
+
+}
+
+module "SQLDB" {
+  source              = "./modules/sqldatabase"
+  name                = lower(join("", [var.PREFIX, "DB", local.YEAR, var.ENV]))
+  server_id           = module.SQLServer.id
+  resource_group_name = module.RG.name
+  location            = module.RG.location
+}
+
+
+module "SQLDB_FIREWALL" {
+  source           = "./modules/sqldbfirewall"
+  name             = lower(join("", [var.PREFIX, "FW", local.YEAR, var.ENV]))
+  server_id        = module.SQLServer.id
+  start_ip_address = var.ip_address
+  end_ip_address   = var.ip_address
+}
+
+# resource "azurerm_key_vault_secret" "sql_admin_password" {
+#   name         = "sql-admin-password"
+#   value        = random_password.sql_admin_password.result
+#   key_vault_id = module.KV.id
+
+# }
+
+module "COSMOSACC" {
+  source              = "./modules/cosmosac"
+  name                = lower(join("", [var.PREFIX, "COSMOS", local.YEAR, var.ENV]))
+  resource_group_name = module.RG.name
+  location            = module.RG.location
+  identity_id         = module.UAI.id
+}
+
+module "cosmosmongodb" {
+  source              = "./modules/cosmosmongodb"
+  name                = lower(join("", [var.PREFIX, "COSMOS", local.YEAR, var.ENV]))
+  resource_group_name = module.RG.name
+  account_name        = module.COSMOSACC.name
 }
