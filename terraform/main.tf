@@ -256,6 +256,16 @@ module "cosmosmongodb" {
   account_name        = module.COSMOSACC.name
 }
 
+module "COSMOSMONGODB_COLLECTION" {
+  source              = "./modules/cosmosmongocollection"
+  name                = lower(join("", [var.PREFIX, "collection", local.YEAR, var.ENV]))
+  resource_group_name = module.RG.name
+  account_name        = module.COSMOSACC.name
+  database_name       = module.cosmosmongodb.name
+  shard_key           = "OrderId"
+
+}
+
 
 resource "azurerm_key_vault_secret" "sql_admin_password" {
   name         = "sql-admin-password"
