@@ -94,16 +94,29 @@ public class CheckoutModel : PageModel
             // Get URL from environment variable
             // This should be set in your Azure Function App settings
             var url = Environment.GetEnvironmentVariable("OrderItemsReserverUrl");
+            var url2 = Environment.GetEnvironmentVariable("OrderItemsSaveUrl");
 
             // Make external API call
             using (var httpClient = new HttpClient())
             {
-                //var response = await httpClient.PostAsync("https://fda1232121.azurewebsites.net/api/OrderItemsReserver", jsonContent);
+                //var response = await httpClient.PostAsync("https://az204-wfa-orderitemreserver-2025-dev.azurewebsites.net/api/OrderItemsReserver", jsonContent);
                 var response = await httpClient.PostAsync(url, jsonContent);
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger.LogWarning("Failed to send order details to external API. Status Code: {StatusCode}", response.StatusCode);
-                    return StatusCode((int)response.StatusCode);
+                    //return StatusCode((int)response.StatusCode);
+                }
+            }
+
+            //Save order details to Cosmos DB
+
+            using (var httpClient = new HttpClient())
+            {
+                var response = await httpClient.PostAsync(url2, jsonContent);
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Failed to save order details to Cosmos DB. Status Code: {StatusCode}", response.StatusCode);
+                    //return StatusCode((int)response.StatusCode);
                 }
             }
 
