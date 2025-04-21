@@ -10,4 +10,3 @@ output "name" {
   value       = azurerm_cosmosdb_mongo_database.cosmosmongodb.name
 
 }
-

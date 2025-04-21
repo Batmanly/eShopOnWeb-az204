@@ -30,8 +30,12 @@ module "AWAPP" {
     each.value.app_settings,
     each.key == "aspapinorth" ? { "APPINSIGHTS_INSTRUMENTATIONKEY" = module.APPI.instrumentation_key } : {},
     // OrderItemsReserverUrl
-    each.key == "aspwebnorth" ? { "OrderItemsReserverUrl" = "https://${module.WFA.default_hostname}/api/OrderItemsReserver" } : {},
-    each.key == "aspwebwest" ? { "OrderItemsReserverUrl" = "https://${module.WFA.default_hostname}/api/OrderItemsReserver" } : {},
+    each.key == "aspwebnorth" ? { "OrderItemsReserverUrl" = "https://${module.WFAOrderItemReserver.default_hostname}/api/OrderItemsReserver" } : {},
+    each.key == "aspwebwest" ? { "OrderItemsReserverUrl" = "https://${module.WFAOrderItemReserver.default_hostname}/api/OrderItemsReserver" } : {},
+    each.key == "aspwebwest" ? { "OrderItemsSaveUrl" = "https://${module.WFAOrderItemSave.default_hostname}/api/OrderItemsSave" } : {},
+    each.key == "aspwebnorth" ? { "OrderItemsSaveUrl" = "https://${module.WFAOrderItemSave.default_hostname}/api/OrderItemsSave" } : {},
+    { "ConnectionStrings:CatalogConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBIdentity.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
+    { "ConnectionStrings:IdentityConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBCatalog.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
   )
 }
 
@@ -142,17 +146,34 @@ module "SA" {
   account_replication_type = "LRS"
 }
 
-module "WFA" {
+module "WFAOrderItemReserver" {
   source                     = "./modules/wfa"
-  name                       = join("-", [var.PREFIX, "WFA", local.YEAR, var.ENV])
+  name                       = join("-", [var.PREFIX, "WFA", "OrderItemReserver", local.YEAR, var.ENV])
   resource_group_name        = module.RG.name
   location                   = module.RG.location
   storage_account_name       = module.SA.name
   storage_account_access_key = module.SA.primary_access_key
-  service_plan_id            = module.ASP["aspfunctionnorth"].id
+  service_plan_id            = module.ASP["aspapinorthOrderItemReserver"].id
   app_settings = {
     "application_insights_connection_string" = module.APPI.connection_string
     "application_insights_key"               = module.APPI.instrumentation_key
+  }
+}
+
+module "WFAOrderItemSave" {
+  source                     = "./modules/wfa"
+  name                       = join("-", [var.PREFIX, "WFA", "OrderItemSave", local.YEAR, var.ENV])
+  resource_group_name        = module.RG.name
+  location                   = module.RG.location
+  storage_account_name       = module.SA.name
+  storage_account_access_key = module.SA.primary_access_key
+  service_plan_id            = module.ASP["aspapinorthOrderItemSave"].id
+  app_settings = {
+    "application_insights_connection_string" = module.APPI.connection_string
+    "application_insights_key"               = module.APPI.instrumentation_key
+    "CosmosDbConnectionString"               = module.COSMOSACC.primary_mongodb_connection_string
+    "DatabaseName"                           = module.cosmosmongodb.name
+    "CollectionName"                         = module.COSMOSMONGODB_COLLECTION.name
   }
 }
 
@@ -187,7 +208,7 @@ module "KV_POLICY" {
   tenant_id               = data.azurerm_client_config.current.tenant_id
   object_id               = data.azurerm_client_config.current.object_id
   key_permissions         = ["Get", "List", "Delete", "Create"]
-  secret_permissions      = ["Get", "Set", "Delete", "List"]
+  secret_permissions      = ["Get", "Set", "Delete", "List", "Purge"]
   certificate_permissions = ["Get"]
 
 }

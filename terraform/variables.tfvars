@@ -15,7 +15,12 @@ ASP_OBJECTS = {
     os_type  = "Windows"
     sku_name = "S1"
   },
-  "aspfunctionnorth" = {
+  "aspapinorthOrderItemReserver" = {
+    location = "northeurope"
+    os_type  = "Windows"
+    sku_name = "Y1"
+  },
+  "aspapinorthOrderItemSave" = {
     location = "northeurope"
     os_type  = "Windows"
     sku_name = "Y1"

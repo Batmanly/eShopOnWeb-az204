@@ -21,3 +21,8 @@ output "endpoint" {
 
 }
 
+output "primary_mongodb_connection_string" {
+  description = "The primary read-only key of the Cosmos DB account."
+  value       = azurerm_cosmosdb_account.cosmosdb_account.primary_mongodb_connection_string
+
+}

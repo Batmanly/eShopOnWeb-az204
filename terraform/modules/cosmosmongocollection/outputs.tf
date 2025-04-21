@@ -4,7 +4,6 @@ output "name" {
 
 }
 
-
 output "id" {
   description = "ID"
   value       = azurerm_cosmosdb_mongo_collection.mongodbcollection.id
