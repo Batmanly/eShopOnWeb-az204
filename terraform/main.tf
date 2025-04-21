@@ -185,10 +185,11 @@ module "KV_POLICY" {
   source                  = "./modules/kvpolicy"
   key_vault_id            = module.KV.id
   tenant_id               = data.azurerm_client_config.current.tenant_id
-  object_id               = module.UAI.principal_id
+  object_id               = data.azurerm_client_config.current.object_id
   key_permissions         = ["Get", "List", "Delete", "Create"]
-  secret_permissions      = ["Get", "Set", "Delete"]
+  secret_permissions      = ["Get", "Set", "Delete", "List"]
   certificate_permissions = ["Get"]
+
 }
 
 resource "random_password" "sql_admin_password" {
@@ -206,9 +207,17 @@ module "SQLServer" {
 
 }
 
-module "SQLDB" {
+module "SQLDBCatalog" {
   source              = "./modules/sqldatabase"
-  name                = lower(join("", [var.PREFIX, "DB", local.YEAR, var.ENV]))
+  name                = lower(join("", [var.PREFIX, "dbcatalog", local.YEAR, var.ENV]))
+  server_id           = module.SQLServer.id
+  resource_group_name = module.RG.name
+  location            = module.RG.location
+}
+
+module "SQLDBIdentity" {
+  source              = "./modules/sqldatabase"
+  name                = lower(join("", [var.PREFIX, "dbidentity", local.YEAR, var.ENV]))
   server_id           = module.SQLServer.id
   resource_group_name = module.RG.name
   location            = module.RG.location
@@ -223,12 +232,14 @@ module "SQLDB_FIREWALL" {
   end_ip_address   = var.ip_address
 }
 
-# resource "azurerm_key_vault_secret" "sql_admin_password" {
-#   name         = "sql-admin-password"
-#   value        = random_password.sql_admin_password.result
-#   key_vault_id = module.KV.id
+module "SQLDB_FIREWALL_AZURE_RESOURCES" {
+  source           = "./modules/sqldbfirewall"
+  name             = lower(join("", [var.PREFIX, "FW", local.YEAR, var.ENV, "AZURE"]))
+  server_id        = module.SQLServer.id
+  start_ip_address = "0.0.0.0"
+  end_ip_address   = "0.0.0.0"
+}
 
-# }
 
 module "COSMOSACC" {
   source              = "./modules/cosmosac"
@@ -243,4 +254,32 @@ module "cosmosmongodb" {
   name                = lower(join("", [var.PREFIX, "COSMOS", local.YEAR, var.ENV]))
   resource_group_name = module.RG.name
   account_name        = module.COSMOSACC.name
+}
+
+
+resource "azurerm_key_vault_secret" "sql_admin_password" {
+  name         = "sql-admin-password"
+  value        = random_password.sql_admin_password.result
+  key_vault_id = module.KV.id
+  depends_on   = [module.SQLServer, module.KV_POLICY]
+}
+
+
+resource "null_resource" "database_setup" {
+  provisioner "local-exec" {
+    command = <<EOT
+
+    # execute init.sql
+    sqlcmd -S ${module.SQLServer.fqdn} -d ${module.SQLDBIdentity.name} -U ${module.SQLServer.administrator_login} -P '${random_password.sql_admin_password.result}' -I -i ../src/Web/AppIdentityDbContext.sql
+    sqlcmd -S ${module.SQLServer.fqdn} -d ${module.SQLDBCatalog.name} -U ${module.SQLServer.administrator_login} -P '${random_password.sql_admin_password.result}' -I -i ../src/Web/CatalogContext.sql
+
+    EOT
+
+  }
+  depends_on = [
+    module.SQLDBIdentity,
+    module.SQLDBCatalog,
+    module.SQLServer,
+    azurerm_key_vault_secret.sql_admin_password
+  ]
 }
