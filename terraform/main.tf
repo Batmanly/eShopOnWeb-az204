@@ -171,7 +171,7 @@ module "WFAOrderItemSave" {
   app_settings = {
     "application_insights_connection_string" = module.APPI.connection_string
     "application_insights_key"               = module.APPI.instrumentation_key
-    "CosmosDbConnectionString"               = module.COSMOSACC.primary_mongodb_connection_string
+    "CosmosMongoDbConnection"                = module.COSMOSACC.primary_mongodb_connection_string
     "DatabaseName"                           = module.cosmosmongodb.name
     "CollectionName"                         = module.COSMOSMONGODB_COLLECTION.name
   }
