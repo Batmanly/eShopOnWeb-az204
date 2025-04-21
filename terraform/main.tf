@@ -32,8 +32,8 @@ module "AWAPP" {
     // OrderItemsReserverUrl
     each.key == "aspwebnorth" ? { "OrderItemsReserverUrl" = "https://${module.WFAOrderItemReserver.default_hostname}/api/OrderItemsReserver" } : {},
     each.key == "aspwebwest" ? { "OrderItemsReserverUrl" = "https://${module.WFAOrderItemReserver.default_hostname}/api/OrderItemsReserver" } : {},
-    each.key == "aspwebwest" ? { "OrderItemsSaveUrl" = "https://${module.WFAOrderItemSave.default_hostname}/api/OrderItemsSave" } : {},
-    each.key == "aspwebnorth" ? { "OrderItemsSaveUrl" = "https://${module.WFAOrderItemSave.default_hostname}/api/OrderItemsSave" } : {},
+    each.key == "aspwebwest" ? { "OrderItemsSaveUrl" = "https://${module.WFAOrderItemSave.default_hostname}/api/OrderItemSave" } : {},
+    each.key == "aspwebnorth" ? { "OrderItemsSaveUrl" = "https://${module.WFAOrderItemSave.default_hostname}/api/OrderItemSave" } : {},
     { "ConnectionStrings:CatalogConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBIdentity.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
     { "ConnectionStrings:IdentityConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBCatalog.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
   )
