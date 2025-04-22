@@ -11,3 +11,7 @@ output "default_hostname" {
   value = azurerm_windows_web_app.awapp.default_hostname
 }
 
+output "identity" {
+  value = azurerm_windows_web_app.awapp.identity
+
+}

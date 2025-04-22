@@ -34,9 +34,17 @@ module "AWAPP" {
     each.key == "aspwebwest" ? { "OrderItemsReserverUrl" = "https://${module.WFAOrderItemReserver.default_hostname}/api/OrderItemsReserver" } : {},
     each.key == "aspwebwest" ? { "OrderItemsSaveUrl" = "https://${module.WFAOrderItemSave.default_hostname}/api/OrderItemSave" } : {},
     each.key == "aspwebnorth" ? { "OrderItemsSaveUrl" = "https://${module.WFAOrderItemSave.default_hostname}/api/OrderItemSave" } : {},
-    { "ConnectionStrings:CatalogConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBIdentity.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
-    { "ConnectionStrings:IdentityConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBCatalog.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
+    # access connection strings from key vault via references
+    {
+      "ConnectionStrings:CatalogConnection"  = "@Microsoft.KeyVault(SecretUri=${module.KV.vault_uri}secrets/sql-connection-string-catalog)"
+      "ConnectionStrings:IdentityConnection" = "@Microsoft.KeyVault(SecretUri=${module.KV.vault_uri}secrets/sql-connection-string-identity)"
+    },
+    { "AZURE_CLIENT_ID" = module.UAI.client_id },
+    { "KeyVaultName" = module.KV.name },
+    # { "ConnectionStrings:CatalogConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBIdentity.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
+    # { "ConnectionStrings:IdentityConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBCatalog.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
   )
+  identity_ids = [module.UAI.id]
 }
 
 module "AWAPPSLOT" {
@@ -213,6 +221,18 @@ module "KV_POLICY" {
 
 }
 
+module "KV_POLICY_UAI" {
+  source                  = "./modules/kvpolicy"
+  key_vault_id            = module.KV.id
+  tenant_id               = data.azurerm_client_config.current.tenant_id
+  object_id               = module.UAI.principal_id
+  key_permissions         = ["Get", "List", "Delete", "Create"]
+  secret_permissions      = ["Get", "Set", "Delete", "List", "Purge"]
+  certificate_permissions = ["Get"]
+
+}
+
+
 resource "random_password" "sql_admin_password" {
   length  = 16
   special = true
@@ -293,6 +313,21 @@ resource "azurerm_key_vault_secret" "sql_admin_password" {
   value        = random_password.sql_admin_password.result
   key_vault_id = module.KV.id
   depends_on   = [module.SQLServer, module.KV_POLICY]
+}
+
+# store connection string in key vault
+resource "azurerm_key_vault_secret" "sql_connection_string_identity" {
+  name         = "sql-connection-string-identity"
+  value        = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBIdentity.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};"
+  key_vault_id = module.KV.id
+  depends_on   = [module.SQLDBIdentity, module.KV_POLICY]
+}
+
+resource "azurerm_key_vault_secret" "sql_connection_string_catalog" {
+  name         = "sql-connection-string-catalog"
+  value        = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBCatalog.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};"
+  key_vault_id = module.KV.id
+  depends_on   = [module.SQLDBCatalog, module.KV_POLICY]
 }
 
 

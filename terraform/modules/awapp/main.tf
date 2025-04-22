@@ -11,4 +11,8 @@ resource "azurerm_windows_web_app" "awapp" {
   }
   app_settings = var.app_settings
 
+  identity {
+    type         = "UserAssigned"
+    identity_ids = var.identity_ids
+  }
 }

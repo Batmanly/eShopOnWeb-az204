@@ -26,3 +26,4 @@ output "tenant_id" {
   value       = azurerm_user_assigned_identity.uai.tenant_id
 
 }
+

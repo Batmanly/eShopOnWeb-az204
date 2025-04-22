@@ -29,3 +29,9 @@ variable "app_settings" {
   description = "The application settings"
   type        = map(string)
 }
+
+variable "identity_ids" {
+  description = "The identity ids"
+  type        = list(string)
+  default     = []
+}
