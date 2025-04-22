@@ -15,4 +15,5 @@ resource "azurerm_windows_web_app" "awapp" {
     type         = "UserAssigned"
     identity_ids = var.identity_ids
   }
+  key_vault_reference_identity_id = var.key_vault_reference_identity_id
 }

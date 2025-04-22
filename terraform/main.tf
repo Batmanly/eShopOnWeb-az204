@@ -19,13 +19,14 @@ module "ASP" {
 }
 
 module "AWAPP" {
-  source              = "./modules/awapp"
-  for_each            = var.AWAPP_OBJECTS
-  name                = join("", [lower(var.PREFIX), each.key, local.YEAR, lower(var.ENV)])
-  resource_group_name = module.RG.name
-  location            = module.ASP[each.value.service_plan_key].location
-  service_plan_id     = module.ASP[each.value.service_plan_key].id
-  dotnet_version      = each.value.dotnet_version
+  source                          = "./modules/awapp"
+  for_each                        = var.AWAPP_OBJECTS
+  name                            = join("", [lower(var.PREFIX), each.key, local.YEAR, lower(var.ENV)])
+  resource_group_name             = module.RG.name
+  location                        = module.ASP[each.value.service_plan_key].location
+  service_plan_id                 = module.ASP[each.value.service_plan_key].id
+  dotnet_version                  = each.value.dotnet_version
+  key_vault_reference_identity_id = module.UAI.id
   app_settings = merge(
     each.value.app_settings,
     each.key == "aspapinorth" ? { "APPINSIGHTS_INSTRUMENTATIONKEY" = module.APPI.instrumentation_key } : {},
@@ -41,6 +42,7 @@ module "AWAPP" {
     },
     { "AZURE_CLIENT_ID" = module.UAI.client_id },
     { "KeyVaultName" = module.KV.name },
+    { "keyVaultReferenceIdentity" = module.UAI.id },
     # { "ConnectionStrings:CatalogConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBIdentity.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
     # { "ConnectionStrings:IdentityConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBCatalog.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
   )

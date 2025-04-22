@@ -35,3 +35,8 @@ variable "identity_ids" {
   type        = list(string)
   default     = []
 }
+
+variable "key_vault_reference_identity_id" {
+  description = "The identity id that will be used to access the key vault"
+  type        = string
+}
