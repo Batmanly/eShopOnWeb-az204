@@ -18,6 +18,7 @@ namespace OrderItemsReserverServiceBus
 
         // Get the connection string from environment variables
         private readonly string _logicAppUrl = Environment.GetEnvironmentVariable("LogicAppTriggerUrl");
+        private const int RetryAttempts = 3; // Specify how many retries to attempt
 
         public OrderItemsReserverServiceBus(ILogger<OrderItemsReserverServiceBus> logger, BlobServiceClient blobServiceClient)
         {
@@ -46,20 +47,11 @@ namespace OrderItemsReserverServiceBus
                 }
 
                 string orderId = order.OrderId; // Use the provided OrderId
+
                 _logger.LogInformation("Saving order {OrderId} to blob storage...", orderId);
 
-                // Save order data to Azure Blob Storage
-                var containerClient = _blobServiceClient.GetBlobContainerClient("orders");
-                await containerClient.CreateIfNotExistsAsync();
-
-                var blobClient = containerClient.GetBlobClient($"{orderId}.json");
-
-                using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(requestBody)))
-                {
-                    await blobClient.UploadAsync(stream, overwrite: true);
-                }
-
-                _logger.LogInformation($"Order {orderId} has been saved to blob storage.");
+                // Save order data to Azure Blob Storage with retry policy
+                await UploadToBlobWithRetriesAsync(containerName: "orders", blobName: $"{orderId}.json", content: requestBody);
 
                 // Complete message processing
                 await messageActions.CompleteMessageAsync(message);
@@ -104,6 +96,45 @@ namespace OrderItemsReserverServiceBus
                 catch (Exception abandonEx)
                 {
                     _logger.LogError(abandonEx, "Failed to abandon message: {MessageId}", message.MessageId);
+                }
+            }
+        }
+
+        // Method to upload to Blob Storage with a retry mechanism
+        private async Task UploadToBlobWithRetriesAsync(string containerName, string blobName, string content)
+        {
+            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            await containerClient.CreateIfNotExistsAsync();
+
+            var blobClient = containerClient.GetBlobClient(blobName);
+
+            int attempt = 0;
+            while (attempt < RetryAttempts)
+            {
+                try
+                {
+                    using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(content)))
+                    {
+                        await blobClient.UploadAsync(stream, overwrite: true);
+                    }
+
+                    _logger.LogInformation("Successfully uploaded to blob storage on attempt {Attempt}.", attempt + 1);
+                    return; // Exit if the upload succeeds
+                }
+                catch (Exception ex)
+                {
+                    attempt++;
+                    _logger.LogWarning("Failed to upload to blob storage (attempt {Attempt}/{MaxAttempts}). Error: {Message}", attempt, RetryAttempts, ex.Message);
+
+                    if (attempt >= RetryAttempts)
+                    {
+                        _logger.LogError("All retry attempts failed for uploading to blob storage.");
+                        throw; // Rethrow the exception after exhausting retries
+                    }
+
+                    // Implement exponential backoff delay
+                    int delayInSeconds = (int)Math.Pow(2, attempt); // Exponential backoff
+                    await Task.Delay(TimeSpan.FromSeconds(delayInSeconds));
                 }
             }
         }
