@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -16,9 +17,8 @@ namespace OrderItemsReserverServiceBus
         private readonly ILogger<OrderItemsReserverServiceBus> _logger;
         private readonly BlobServiceClient _blobServiceClient;
 
-        // Get the connection string from environment variables
         private readonly string _logicAppUrl = Environment.GetEnvironmentVariable("LogicAppTriggerUrl");
-        private const int RetryAttempts = 3; // Specify how many retries to attempt
+        private const int RetryAttempts = 3;
 
         public OrderItemsReserverServiceBus(ILogger<OrderItemsReserverServiceBus> logger, BlobServiceClient blobServiceClient)
         {
@@ -46,7 +46,7 @@ namespace OrderItemsReserverServiceBus
                     throw new InvalidOperationException("OrderId is missing or invalid in the received message.");
                 }
 
-                string orderId = order.OrderId; // Use the provided OrderId
+                string orderId = order.OrderId;
 
                 _logger.LogInformation("Saving order {OrderId} to blob storage...", orderId);
 
@@ -61,36 +61,12 @@ namespace OrderItemsReserverServiceBus
             {
                 _logger.LogError(ex, "An error occurred while processing the message.");
 
-                // Trigger Logic App in case of a Service Bus connection issue
-                if (!string.IsNullOrEmpty(_logicAppUrl))
-                {
-                    try
-                    {
-                        using var httpClient = new System.Net.Http.HttpClient();
-                        var response = await httpClient.PostAsync(_logicAppUrl, new System.Net.Http.StringContent($"{{\"error\":\"{ex.Message}\"}}", Encoding.UTF8, "application/json"));
+                // Trigger the Logic App in case of a failure
+                await TriggerLogicAppAsync(message);
 
-                        if (response.IsSuccessStatusCode)
-                        {
-                            _logger.LogInformation("Logic App triggered successfully.");
-                        }
-                        else
-                        {
-                            _logger.LogError("Failed to trigger Logic App. Status Code: {StatusCode}, Reason: {Reason}", response.StatusCode, response.ReasonPhrase);
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.LogError(e, "Error while attempting to trigger the Logic App.");
-                    }
-                }
-                else
-                {
-                    _logger.LogError("Logic App URL is not configured. Unable to trigger Logic App.");
-                }
-
+                // Abandon the message so it can be retried later
                 try
                 {
-                    // Abandon the message so it can be retried later
                     await messageActions.AbandonMessageAsync(message);
                 }
                 catch (Exception abandonEx)
@@ -100,11 +76,20 @@ namespace OrderItemsReserverServiceBus
             }
         }
 
-        // Method to upload to Blob Storage with a retry mechanism
         private async Task UploadToBlobWithRetriesAsync(string containerName, string blobName, string content)
         {
             var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
-            await containerClient.CreateIfNotExistsAsync();
+
+            try
+            {
+                // Ensure the container exists
+                await containerClient.CreateIfNotExistsAsync();
+            }
+            catch (Exception containerEx)
+            {
+                _logger.LogError(containerEx, "Failed to create or access blob container {ContainerName}.", containerName);
+                throw new InvalidOperationException($"Blob container {containerName} cannot be accessed or created.", containerEx);
+            }
 
             var blobClient = containerClient.GetBlobClient(blobName);
 
@@ -119,7 +104,7 @@ namespace OrderItemsReserverServiceBus
                     }
 
                     _logger.LogInformation("Successfully uploaded to blob storage on attempt {Attempt}.", attempt + 1);
-                    return; // Exit if the upload succeeds
+                    return;
                 }
                 catch (Exception ex)
                 {
@@ -133,19 +118,53 @@ namespace OrderItemsReserverServiceBus
                     }
 
                     // Implement exponential backoff delay
-                    int delayInSeconds = (int)Math.Pow(2, attempt); // Exponential backoff
+                    int delayInSeconds = (int)Math.Pow(2, attempt);
                     await Task.Delay(TimeSpan.FromSeconds(delayInSeconds));
                 }
             }
         }
 
-        // Define a helper class to deserialize the incoming JSON
+        private async Task TriggerLogicAppAsync(ServiceBusReceivedMessage message)
+        {
+            if (string.IsNullOrEmpty(_logicAppUrl))
+            {
+                _logger.LogError("Logic App URL is not configured. Unable to trigger Logic App.");
+                return;
+            }
+
+            
+
+            try
+            {
+                using var httpClient = new HttpClient();
+                //var requestContent = new StringContent(JsonSerializer.Serialize(message.Body.ToString()), Encoding.UTF8, "application/json");
+                // send message body as json
+                var requestContent = new StringContent(message.Body.ToString(), Encoding.UTF8, "application/json");
+
+                // Send the POST request to Logic App
+                var response = await httpClient.PostAsync(_logicAppUrl, requestContent);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("Logic App triggered successfully for message ID {MessageId}.", message.MessageId);
+                }
+                else
+                {
+                    _logger.LogError("Failed to trigger Logic App. Status Code: {StatusCode}, Reason: {Reason}", response.StatusCode, response.ReasonPhrase);
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Error while attempting to trigger the Logic App.");
+            }
+        }
+
         private class Order
         {
             [JsonPropertyName("OrderId")]
             public string OrderId { get; set; }
 
-            // Other properties can also be added here if needed
+            // Add other properties as needed
         }
     }
 }
