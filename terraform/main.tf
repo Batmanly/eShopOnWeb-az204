@@ -351,3 +351,19 @@ resource "null_resource" "database_setup" {
     azurerm_key_vault_secret.sql_admin_password
   ]
 }
+
+module "SBNS" {
+  source              = "./modules/sbns"
+  name                = join("-", [var.PREFIX, "SBNS", local.YEAR, var.ENV])
+  resource_group_name = module.RG.name
+  location            = module.RG.location
+  sku                 = "Standard"
+
+}
+
+module "SBQ" {
+  source               = "./modules/sbq"
+  name                 = join("-", [var.PREFIX, "Orders", "Queue", local.YEAR, var.ENV])
+  namespace_id         = module.SBNS.id
+  partitioning_enabled = true
+}
