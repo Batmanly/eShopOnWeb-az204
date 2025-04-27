@@ -4,16 +4,32 @@ using Microsoft.Azure.Functions.Worker.Http;
 using System.Text.Json;
 using MongoDB.Driver;
 using Microsoft.Extensions.Logging;
+using System.Text;
+using Newtonsoft.Json;
+using MongoDB.Bson;
 
-public class OrderItem
-{
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string OrderId { get; set; } // This will be our shard key
-    public string ProductId { get; set; }
-    // Add other properties as needed
-}
+
 public class OrderItemSave
 {
+    private readonly ILogger<OrderItemSave> _logger;
+    private readonly MongoClient _mongoClient;
+    private readonly IMongoDatabase _database;
+    private readonly string _connectionString;
+    private readonly string _databaseName;
+    private readonly string _collectionName;
+    private readonly string _shardKey;
+
+    public OrderItemSave(ILogger<OrderItemSave> logger)
+    {
+        _logger = logger;
+        _connectionString = Environment.GetEnvironmentVariable("CosmosMongoDbConnection") ?? throw new ArgumentNullException(nameof(_connectionString));
+        _databaseName = Environment.GetEnvironmentVariable("DatabaseName") ?? throw new ArgumentNullException(nameof(_databaseName));
+        _collectionName = Environment.GetEnvironmentVariable("CollectionName") ?? throw new ArgumentNullException(nameof(_collectionName));
+        _shardKey = Environment.GetEnvironmentVariable("ShardKey") ?? throw new ArgumentNullException(nameof(_shardKey));
+        _mongoClient = new MongoClient(_connectionString);
+        _database = _mongoClient.GetDatabase(_databaseName);
+    }
+
     [Function("OrderItemSave")]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req,
@@ -24,41 +40,41 @@ public class OrderItemSave
 
         try
         {
-            // Read the request body
-            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var orderItem = JsonSerializer.Deserialize<OrderItem>(requestBody);
-
-            // Validate the input
-            if (orderItem == null || string.IsNullOrEmpty(orderItem.OrderId))
+            string requestBody;
+            using (var reader = new StreamReader(req.Body, Encoding.UTF8))
             {
-                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badResponse.WriteAsJsonAsync(new { message = "Invalid JSON or missing OrderId. OrderId is required." });
-                return badResponse;
+                requestBody = await reader.ReadToEndAsync();
             }
 
-            // MongoDB connection details
-            string connectionString = Environment.GetEnvironmentVariable("CosmosMongoDbConnection");
-            string databaseName = Environment.GetEnvironmentVariable("DatabaseName");
-            string collectionName = Environment.GetEnvironmentVariable("CollectionName");
+            var requestData = JsonConvert.DeserializeObject<RequestData>(requestBody);
+            if (requestData == null || string.IsNullOrEmpty(requestData.OrderId))
+            {
+                _logger.LogWarning("Invalid request body, missing OrderId.");
+                var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badRequestResponse.WriteStringAsync("Invalid request. Please provide a valid OrderId in the request body.");
+                return badRequestResponse;
+            }
 
-            // Initialize the MongoDB client
-            var client = new MongoClient(connectionString);
-            var database = client.GetDatabase(databaseName);
-            var collection = database.GetCollection<OrderItem>(collectionName);
+            string orderId = requestData.OrderId;
 
-            // Create index for shard key if it doesn't exist
-            var indexKeysDefinition = Builders<OrderItem>.IndexKeys.Ascending(x => x.OrderId);
-            var createIndexModel = new CreateIndexModel<OrderItem>(indexKeysDefinition);
-            await collection.Indexes.CreateOneAsync(createIndexModel);
+            _logger.LogInformation($"Order {orderId} has been received.");
 
+            var collection = _database.GetCollection<BsonDocument>(_collectionName);
+            var document = BsonDocument.Parse(requestBody);
 
-            // Insert the order item into the collection
-            await collection.InsertOneAsync(orderItem);
+            // Ensure no duplicate 'OrderId' element is added
+            if (!document.Contains(_shardKey))
+            {
+                document.Add(new BsonElement(_shardKey, orderId));
+            }
+
+            await collection.InsertOneAsync(document);
 
             logger.LogInformation("Order item successfully saved to MongoDB.");
 
             var response = req.CreateResponse(HttpStatusCode.OK);
-            await response.WriteAsJsonAsync(new { message = "Order item saved successfully.", id = orderItem.Id });
+            await response.WriteAsJsonAsync(new { OrderId = orderId, Message = "Order created successfully." });
+
             return response;
         }
         catch (Exception ex)
@@ -68,5 +84,10 @@ public class OrderItemSave
             await errorResponse.WriteAsJsonAsync(new { message = "An internal server error occurred." });
             return errorResponse;
         }
+    }
+
+    public class RequestData
+    {
+        public required string OrderId { get; set; }
     }
 }

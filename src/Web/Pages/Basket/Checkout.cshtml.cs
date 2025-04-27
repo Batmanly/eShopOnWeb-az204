@@ -10,6 +10,8 @@ using Microsoft.eShopWeb.ApplicationCore.Exceptions;
 using Microsoft.eShopWeb.ApplicationCore.Interfaces;
 using Microsoft.eShopWeb.Infrastructure.Identity;
 using Microsoft.eShopWeb.Web.Interfaces;
+using Microsoft.Azure.ServiceBus;
+
 
 namespace Microsoft.eShopWeb.Web.Pages.Basket;
 
@@ -93,20 +95,37 @@ public class CheckoutModel : PageModel
 
             // Get URL from environment variable
             // This should be set in your Azure Function App settings
-            var url = Environment.GetEnvironmentVariable("OrderItemsReserverUrl");
+            //var url = Environment.GetEnvironmentVariable("OrderItemsReserverUrl");
             var url2 = Environment.GetEnvironmentVariable("OrderItemsSaveUrl");
+            var ServiceBusQueueName = Environment.GetEnvironmentVariable("ServiceBusQueueName");
+            var ServiceBusConnectionString = Environment.GetEnvironmentVariable("ServiceBusConnectionString");
 
-            // Make external API call
-            using (var httpClient = new HttpClient())
+            var queueClient = new QueueClient(ServiceBusConnectionString, ServiceBusQueueName);
+            var message = new Message(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(orderDetails)))
             {
-                //var response = await httpClient.PostAsync("https://az204-wfa-orderitemreserver-2025-dev.azurewebsites.net/api/OrderItemsReserver", jsonContent);
-                var response = await httpClient.PostAsync(url, jsonContent);
-                if (!response.IsSuccessStatusCode)
-                {
-                    _logger.LogWarning("Failed to send order details to external API. Status Code: {StatusCode}", response.StatusCode);
-                    //return StatusCode((int)response.StatusCode);
-                }
-            }
+                ContentType = "application/json",
+                Label = "OrderDetails",
+                MessageId = orderId
+            };
+
+            // Send the message to the queue
+            await queueClient.SendAsync(message);
+            _logger.LogInformation("Order details sent to Service Bus queue: {QueueName}", ServiceBusQueueName);
+            // Close the client after sending the message
+            await queueClient.CloseAsync();
+
+
+            //// Make external API call
+            //using (var httpClient = new HttpClient())
+            //{
+            //    //var response = await httpClient.PostAsync("https://az204-wfa-orderitemreserver-2025-dev.azurewebsites.net/api/OrderItemsReserver", jsonContent);
+            //    var response = await httpClient.PostAsync(url, jsonContent);
+            //    if (!response.IsSuccessStatusCode)
+            //    {
+            //        _logger.LogWarning("Failed to send order details to external API. Status Code: {StatusCode}", response.StatusCode);
+            //        //return StatusCode((int)response.StatusCode);
+            //    }
+            //}
 
             //Save order details to Cosmos DB
 
@@ -158,4 +177,6 @@ public class CheckoutModel : PageModel
         cookieOptions.Expires = DateTime.Today.AddYears(10);
         Response.Cookies.Append(Constants.BASKET_COOKIENAME, _username, cookieOptions);
     }
+
+
 }

@@ -25,6 +25,7 @@
     <PackageReference Include="BuildBundlerMinifier" Condition="'$(Configuration)'=='Release'" />
     <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+    <PackageReference Include="Microsoft.Azure.ServiceBus" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" />
     <PackageReference Include="Microsoft.Web.LibraryManager.Build" />
