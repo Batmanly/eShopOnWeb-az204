@@ -31,8 +31,8 @@ module "AWAPP" {
     each.value.app_settings,
     each.key == "aspapinorth" ? { "APPINSIGHTS_INSTRUMENTATIONKEY" = module.APPI.instrumentation_key } : {},
     // OrderItemsReserverUrl
-    each.key == "aspwebnorth" ? { "OrderItemsReserverUrl" = "https://${module.WFAOrderItemReserver.default_hostname}/api/OrderItemsReserver" } : {},
-    each.key == "aspwebwest" ? { "OrderItemsReserverUrl" = "https://${module.WFAOrderItemReserver.default_hostname}/api/OrderItemsReserver" } : {},
+    each.key == "aspwebnorth" ? { "OrderItemsReserverUrl" = "https://${module.WFAOrderItemReserver.default_hostname}/api/OrderItemsReserverServiceBus" } : {},
+    each.key == "aspwebwest" ? { "OrderItemsReserverUrl" = "https://${module.WFAOrderItemReserver.default_hostname}/api/OrderItemsReserverServiceBus" } : {},
     each.key == "aspwebwest" ? { "OrderItemsSaveUrl" = "https://${module.WFAOrderItemSave.default_hostname}/api/OrderItemSave" } : {},
     each.key == "aspwebnorth" ? { "OrderItemsSaveUrl" = "https://${module.WFAOrderItemSave.default_hostname}/api/OrderItemSave" } : {},
     # access connection strings from key vault via references
@@ -43,6 +43,9 @@ module "AWAPP" {
     { "AZURE_CLIENT_ID" = module.UAI.client_id },
     { "KeyVaultName" = module.KV.name },
     { "keyVaultReferenceIdentity" = module.UAI.id },
+    { "ServiceBusConnectionString" = module.SBNS.default_primary_connection_string },
+    { "ServiceBusQueueName" = module.SBQ.name },
+
     # { "ConnectionStrings:CatalogConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBIdentity.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
     # { "ConnectionStrings:IdentityConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBCatalog.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
   )
@@ -167,6 +170,9 @@ module "WFAOrderItemReserver" {
   app_settings = {
     "application_insights_connection_string" = module.APPI.connection_string
     "application_insights_key"               = module.APPI.instrumentation_key
+    "ServiceBusConnectionString"             = module.SBNS.default_primary_connection_string
+    "ServiceBusQueueName"                    = module.SBQ.name
+    "LogicAppTriggerUrl"                     = module.LOGICAPP.access_endpoint
   }
 }
 
@@ -184,6 +190,7 @@ module "WFAOrderItemSave" {
     "CosmosMongoDbConnection"                = module.COSMOSACC.primary_mongodb_connection_string
     "DatabaseName"                           = module.cosmosmongodb.name
     "CollectionName"                         = module.COSMOSMONGODB_COLLECTION.name
+    "ShardKey"                               = "OrderId"
   }
 }
 
@@ -366,4 +373,31 @@ module "SBQ" {
   name                 = join("-", [var.PREFIX, "Orders", "Queue", local.YEAR, var.ENV])
   namespace_id         = module.SBNS.id
   partitioning_enabled = true
+}
+
+module "LOGICAPP" {
+  source              = "./modules/logicapp"
+  name                = join("-", [var.PREFIX, "LogicApp", local.YEAR, var.ENV])
+  resource_group_name = module.RG.name
+  location            = module.RG.location
+
+}
+
+# Create Logic App Workflow
+data "local_file" "logic_app" {
+  filename = "${path.module}/workflow.json"
+}
+
+# Deploy Logic App Workflow
+resource "azurerm_resource_group_template_deployment" "logic_app_deployment" {
+  resource_group_name = module.RG.name
+  deployment_mode     = "Incremental"
+  name                = "logic-app-deployment"
+
+  template_content = data.local_file.logic_app.content
+  parameters_content = jsonencode({
+    "logic_app_name" = { value = module.LOGICAPP.name }
+    "location"       = { value = module.LOGICAPP.location }
+  })
+  depends_on = [module.LOGICAPP]
 }

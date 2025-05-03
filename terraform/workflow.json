@@ -1,0 +1,148 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "logic_app_name": {
+            "type": "String"
+        },
+
+        "location": {
+            "defaultValue": "uksouth",
+            "type": "String"
+        }
+     },
+    "variables": {
+      
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('logic_app_name')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "triggers": {
+                        "When_a_HTTP_request_is_received": {
+                            "type": "Request",
+                            "kind": "Http",
+                            "inputs": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "OrderId": {
+                                            "type": "string"
+                                        },
+                                        "BasketId": {
+                                            "type": "integer"
+                                        },
+                                        "BuyerId": {
+                                            "type": "string"
+                                        },
+                                        "Items": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "Id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "ProductName": {
+                                                        "type": "string"
+                                                    },
+                                                    "Quantity": {
+                                                        "type": "integer"
+                                                    },
+                                                    "UnitPrice": {
+                                                        "type": "number"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "Id",
+                                                    "ProductName",
+                                                    "Quantity",
+                                                    "UnitPrice"
+                                                ]
+                                            }
+                                        },
+                                        "ShippingAddress": {
+                                            "type": "object",
+                                            "properties": {
+                                                "Street": {
+                                                    "type": "string"
+                                                },
+                                                "City": {
+                                                    "type": "string"
+                                                },
+                                                "State": {
+                                                    "type": "string"
+                                                },
+                                                "Country": {
+                                                    "type": "string"
+                                                },
+                                                "ZipCode": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "actions": {
+                        "For_each": {
+                            "foreach": "@triggerOutputs()?['body']?['Items']",
+                            "actions": {
+                                "Send_an_email_(V2)": {
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['outlook']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "body": {
+                                            "To": "yoldas_recep@hotmail.com",
+                                            "Subject": "New Order ( Failed to save Blob Storage )",
+                                            "Body": "<p class=\"editor-paragraph\">{<br>\"OrderId\": \"@{triggerBody()?['OrderId']}\",<br>\"BasketId\": @{triggerBody()?['BasketId']},<br>\"BuyerId\": \"@{triggerBody()?['BuyerId']}\",<br>\"Items\": [<br>{<br>\"Id\": @{item()?['Id']},<br>\"ProductName\": \"@{item()?['ProductName']}\",<br>\"Quantity\": @{item()?['Quantity']} ,<br>\"UnitPrice\": @{item()?['UnitPrice']}<br>}<br>],<br>\"ShippingAddress\": {<br>\"Street\": \"@{triggerBody()?['ShippingAddress']?['Street']}\",<br>\"City\": \"@{triggerBody()?['ShippingAddress']?['City']}\",<br>\"State\": \"@{triggerBody()?['ShippingAddress']?['State']}\",<br>\"Country\": \"@{triggerBody()?['ShippingAddress']?['Country']}\",<br>\"ZipCode\": \"@{triggerBody()?['ShippingAddress']?['ZipCode']}\"<br>}<br>}</p>",
+                                            "Importance": "Normal"
+                                        },
+                                        "path": "/v2/Mail"
+                                    }
+                                }
+                            },
+                            "runAfter": {},
+                            "type": "Foreach"
+                        }
+                    },
+                    "parameters": {
+                        "$connections": {
+                            "type": "Object",
+                            "defaultValue": {}
+                        }
+                    }
+                },
+                "parameters": {
+                    "$connections": {
+                        "type": "Object",
+                        "value": {
+                            "outlook": {
+                                "id": "/subscriptions/eaeb2398-aed1-43e9-a305-6abad2295400/providers/Microsoft.Web/locations/northeurope/managedApis/outlook",
+                                "connectionId": "/subscriptions/eaeb2398-aed1-43e9-a305-6abad2295400/resourceGroups/AZ204-RG-2025-DEV/providers/Microsoft.Web/connections/outlook",
+                                "connectionName": "outlook"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+    ],
+    "outputs": {
+     }
+}

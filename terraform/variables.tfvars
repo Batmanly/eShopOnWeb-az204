@@ -75,4 +75,4 @@ TRAF_ENDPOINT_OBJECTS = {
 }
 
 
-ip_address = "95.15.236.3"
+ip_address = "78.187.71.111"
