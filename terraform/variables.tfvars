@@ -2,17 +2,17 @@ location = "northeurope"
 ASP_OBJECTS = {
   "aspwebwest" = {
     location = "westeurope"
-    os_type  = "Windows"
+    os_type  = "Linux"
     sku_name = "S1"
   },
   "aspwebnorth" = {
     location = "northeurope"
-    os_type  = "Windows"
+    os_type  = "Linux"
     sku_name = "S1"
   },
   "aspapinorth" = {
     location = "northeurope"
-    os_type  = "Windows"
+    os_type  = "Linux"
     sku_name = "S1"
   },
   "aspapinorthOrderItemReserver" = {
@@ -29,22 +29,25 @@ ASP_OBJECTS = {
 
 AWAPP_OBJECTS = {
   "aspwebwest" = {
-    dotnet_version   = "v9.0"
-    service_plan_key = "aspwebwest"
+    # dotnet_version   = "v9.0"
+    service_plan_key  = "aspwebwest"
+    docker_image_name = "web:latest"
     app_settings = {
       ASPNETCORE_ENVIRONMENT = "Development"
     }
   },
   "aspwebnorth" = {
-    dotnet_version   = "v9.0"
-    service_plan_key = "aspwebnorth"
+    # dotnet_version   = "v9.0"
+    service_plan_key  = "aspwebnorth"
+    docker_image_name = "web:latest"
     app_settings = {
       ASPNETCORE_ENVIRONMENT = "Development"
     }
   },
   "aspapinorth" = {
-    dotnet_version   = "v9.0"
-    service_plan_key = "aspapinorth"
+    # dotnet_version   = "v9.0"
+    service_plan_key  = "aspapinorth"
+    docker_image_name = "publicapi:latest"
     app_settings = {
       ASPNETCORE_ENVIRONMENT = "Development"
     }
@@ -53,9 +56,10 @@ AWAPP_OBJECTS = {
 
 AWAPPSLOT_OBJECTS = {
   "staging" = {
-    name             = "staging"
-    service_plan_key = "aspwebnorth"
-    dotnet_version   = "v9.0"
+    name              = "staging"
+    service_plan_key  = "aspwebnorth"
+    docker_image_name = "web:latest"
+    # dotnet_version   = "v9.0"
     app_settings = {
       ASPNETCORE_ENVIRONMENT = "Development"
     }
@@ -75,4 +79,4 @@ TRAF_ENDPOINT_OBJECTS = {
 }
 
 
-ip_address = "78.187.71.111"
+ip_address = "78.169.156.21"

@@ -19,27 +19,90 @@ module "ASP" {
 }
 
 module "AWAPP" {
-  source                          = "./modules/awapp"
-  for_each                        = var.AWAPP_OBJECTS
-  name                            = join("", [lower(var.PREFIX), each.key, local.YEAR, lower(var.ENV)])
-  resource_group_name             = module.RG.name
-  location                        = module.ASP[each.value.service_plan_key].location
-  service_plan_id                 = module.ASP[each.value.service_plan_key].id
-  dotnet_version                  = each.value.dotnet_version
+  source              = "./modules/awapp"
+  for_each            = var.AWAPP_OBJECTS
+  name                = join("", [lower(var.PREFIX), each.key, local.YEAR, lower(var.ENV)])
+  resource_group_name = module.RG.name
+  location            = module.ASP[each.value.service_plan_key].location
+  service_plan_id     = module.ASP[each.value.service_plan_key].id
+  # dotnet_version                  = each.value.dotnet_version
   key_vault_reference_identity_id = module.UAI.id
   app_settings = merge(
     each.value.app_settings,
     each.key == "aspapinorth" ? { "APPINSIGHTS_INSTRUMENTATIONKEY" = module.APPI.instrumentation_key } : {},
+    { "WEBSITES_ENABLE_APP_SERVICE_STORAGE" = "false" },
     // OrderItemsReserverUrl
     each.key == "aspwebnorth" ? { "OrderItemsReserverUrl" = "https://${module.WFAOrderItemReserver.default_hostname}/api/OrderItemsReserverServiceBus" } : {},
     each.key == "aspwebwest" ? { "OrderItemsReserverUrl" = "https://${module.WFAOrderItemReserver.default_hostname}/api/OrderItemsReserverServiceBus" } : {},
     each.key == "aspwebwest" ? { "OrderItemsSaveUrl" = "https://${module.WFAOrderItemSave.default_hostname}/api/OrderItemSave" } : {},
     each.key == "aspwebnorth" ? { "OrderItemsSaveUrl" = "https://${module.WFAOrderItemSave.default_hostname}/api/OrderItemSave" } : {},
+    each.key == "aspapinorth" ? { "WEBSITES_PORT" = "8080" } : {},
+    each.key == "aspwebnorth" ? { "WEBSITES_PORT" = "8080" } : {},
+    each.key == "aspwebwest" ? { "WEBSITES_PORT" = "8080" } : {},
     # access connection strings from key vault via references
-    {
-      "ConnectionStrings:CatalogConnection"  = "@Microsoft.KeyVault(SecretUri=${module.KV.vault_uri}secrets/sql-connection-string-catalog)"
-      "ConnectionStrings:IdentityConnection" = "@Microsoft.KeyVault(SecretUri=${module.KV.vault_uri}secrets/sql-connection-string-identity)"
-    },
+    # {
+    #   "ConnectionStrings:CatalogConnection"  = "@Microsoft.KeyVault(SecretUri=${module.KV.vault_uri}secrets/sql-connection-string-catalog)"
+    #   "ConnectionStrings:IdentityConnection" = "@Microsoft.KeyVault(SecretUri=${module.KV.vault_uri}secrets/sql-connection-string-identity)"
+    # },
+    { "AZURE_CLIENT_ID" = module.UAI.client_id },
+    { "KeyVaultName" = module.KV.name },
+    { "keyVaultReferenceIdentity" = module.UAI.id },
+    { "ServiceBusConnectionString" = module.SBNS.default_primary_connection_string },
+    { "ServiceBusQueueName" = module.SBQ.name },
+    { "DOCKER_ENABLE_CI" = "true" },
+
+    # { "ConnectionStrings:CatalogConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBIdentity.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
+    # { "ConnectionStrings:IdentityConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBCatalog.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
+  )
+  identity_ids = [module.UAI.id]
+
+  docker_image_name     = each.value.docker_image_name
+  docker_image_username = module.ACR.admin_username
+  docker_image_password = module.ACR.admin_password
+  docker_registry_url   = "https://${module.ACR.login_server}"
+  depends_on            = [null_resource.buildPublicApi, null_resource.buildWeb]
+  # connection_string = {
+  #   "CatalogConnection"  = { type = "SQLAzure", value = azurerm_key_vault_secret.sql_connection_string_catalog.value }
+  #   "IdentityConnection" = { type = "SQLAzure", value = azurerm_key_vault_secret.sql_connection_string_identity.value }
+  # }
+  connection_string = {
+    "CatalogConnection"  = { key = "CatalogConnection", type = "SQLAzure", value = "@Microsoft.KeyVault(SecretUri=${module.KV.vault_uri}secrets/sql-connection-string-catalog)" }
+    "IdentityConnection" = { key = "IdentityConnection", type = "SQLAzure", value = "@Microsoft.KeyVault(SecretUri=${module.KV.vault_uri}secrets/sql-connection-string-identity)" }
+  }
+
+}
+
+module "AWAPPSLOT" {
+  source         = "./modules/awappslot"
+  for_each       = var.AWAPPSLOT_OBJECTS
+  name           = each.value.name
+  app_service_id = module.AWAPP[each.value.service_plan_key].id
+  # dotnet_version                  = each.value.dotnet_version
+  # app_settings                    = each.value.app_settings
+  docker_image_name               = each.value.docker_image_name
+  docker_image_username           = module.ACR.admin_username
+  docker_image_password           = module.ACR.admin_password
+  docker_registry_url             = "https://${module.ACR.login_server}"
+  identity_ids                    = [module.UAI.id]
+  key_vault_reference_identity_id = module.UAI.id
+  depends_on                      = [null_resource.buildPublicApi, null_resource.buildWeb]
+  connection_string = {
+    "CatalogConnection"  = { key = "CatalogConnection", type = "SQLAzure", value = "@Microsoft.KeyVault(SecretUri=${module.KV.vault_uri}secrets/sql-connection-string-catalog)" }
+    "IdentityConnection" = { key = "IdentityConnection", type = "SQLAzure", value = "@Microsoft.KeyVault(SecretUri=${module.KV.vault_uri}secrets/sql-connection-string-identity)" }
+  }
+  app_settings = merge(
+    each.value.app_settings,
+    { "APPINSIGHTS_INSTRUMENTATIONKEY" = module.APPI.instrumentation_key },
+    { "WEBSITES_ENABLE_APP_SERVICE_STORAGE" = "false" },
+    // OrderItemsReserverUrl
+    { "OrderItemsReserverUrl" = "https://${module.WFAOrderItemReserver.default_hostname}/api/OrderItemsReserverServiceBus" },
+    { "OrderItemsSaveUrl" = "https://${module.WFAOrderItemSave.default_hostname}/api/OrderItemSave" },
+    { "WEBSITES_PORT" = "8080" },
+    # access connection strings from key vault via references
+    # {
+    #   "ConnectionStrings:CatalogConnection"  = "@Microsoft.KeyVault(SecretUri=${module.KV.vault_uri}secrets/sql-connection-string-catalog)"
+    #   "ConnectionStrings:IdentityConnection" = "@Microsoft.KeyVault(SecretUri=${module.KV.vault_uri}secrets/sql-connection-string-identity)"
+    # },
     { "AZURE_CLIENT_ID" = module.UAI.client_id },
     { "KeyVaultName" = module.KV.name },
     { "keyVaultReferenceIdentity" = module.UAI.id },
@@ -49,16 +112,6 @@ module "AWAPP" {
     # { "ConnectionStrings:CatalogConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBIdentity.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
     # { "ConnectionStrings:IdentityConnection" = "Server=${module.SQLServer.fqdn};Database=${module.SQLDBCatalog.name};User Id=${module.SQLServer.administrator_login};Password=${random_password.sql_admin_password.result};" },
   )
-  identity_ids = [module.UAI.id]
-}
-
-module "AWAPPSLOT" {
-  source         = "./modules/awappslot"
-  for_each       = var.AWAPPSLOT_OBJECTS
-  name           = each.value.name
-  app_service_id = module.AWAPP[each.value.service_plan_key].id
-  dotnet_version = each.value.dotnet_version
-  app_settings   = each.value.app_settings
 }
 
 resource "azurerm_monitor_autoscale_setting" "amass" {
@@ -383,21 +436,60 @@ module "LOGICAPP" {
 
 }
 
-# Create Logic App Workflow
-data "local_file" "logic_app" {
-  filename = "${path.module}/workflow.json"
+# # Create Logic App Workflow
+# data "local_file" "logic_app" {
+#   filename = "${path.module}/workflow.json"
+# }
+
+# # Deploy Logic App Workflow
+# resource "azurerm_resource_group_template_deployment" "logic_app_deployment" {
+#   resource_group_name = module.RG.name
+#   deployment_mode     = "Incremental"
+#   name                = "logic-app-deployment"
+
+#   template_content = data.local_file.logic_app.content
+#   parameters_content = jsonencode({
+#     "logic_app_name" = { value = module.LOGICAPP.name }
+#     "location"       = { value = module.LOGICAPP.location }
+#   })
+#   depends_on = [module.LOGICAPP, module.RG]
+# }
+
+module "ACR" {
+  source              = "./modules/acr"
+  name                = lower(join("", [var.PREFIX, "ACR", local.YEAR, var.ENV]))
+  resource_group_name = module.RG.name
+  location            = module.RG.location
+  sku                 = "Premium"
+  admin_enabled       = true
+  georeplications     = []
+
 }
 
-# Deploy Logic App Workflow
-resource "azurerm_resource_group_template_deployment" "logic_app_deployment" {
-  resource_group_name = module.RG.name
-  deployment_mode     = "Incremental"
-  name                = "logic-app-deployment"
+resource "null_resource" "buildPublicApi" {
+  provisioner "local-exec" {
+    command = <<EOT
+    az acr build --registry ${module.ACR.name} --image publicapi:latest -f ../DockerfileApi ../. -g ${module.RG.name}
+    EOT
+  }
+  // trigger with md5 hash
+  triggers = {
+    hash = md5(file("../DockerfileApi"))
+  }
+  depends_on = [module.ACR]
 
-  template_content = data.local_file.logic_app.content
-  parameters_content = jsonencode({
-    "logic_app_name" = { value = module.LOGICAPP.name }
-    "location"       = { value = module.LOGICAPP.location }
-  })
-  depends_on = [module.LOGICAPP]
+}
+
+resource "null_resource" "buildWeb" {
+  provisioner "local-exec" {
+    command = <<EOT
+    az acr build --registry ${module.ACR.name} --image web:latest -f ../DockerfileWeb ../. -g ${module.RG.name}
+    EOT
+  }
+  // trigger with md5 hash
+  triggers = {
+    hash = md5(file("../DockerfileWeb"))
+  }
+  depends_on = [module.ACR]
+
 }

@@ -1,6 +1,6 @@
 {
     "baseUrls": {
-        "apiBase": "https://${ API_URL }/api/"
+        "apiBase": "https://az204aspapinorth2025dev.azurewebsites.net/api/"
     },
     "ConnectionStrings": {
         "CatalogConnection": "",
